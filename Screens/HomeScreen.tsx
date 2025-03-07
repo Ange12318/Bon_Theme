@@ -15,19 +15,23 @@ const HomeScreen = ({ navigation }) => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'urgent': return '#FF4040';
-      case 'warning': return '#FFA500';
-      case 'safe': return '#32CD32';
-      default: return '#32CD32';
+      case 'urgent':
+        return '#FF4040';
+      case 'warning':
+        return '#FFA500';
+      case 'safe':
+        return '#32CD32';
+      default:
+        return '#32CD32';
     }
   };
 
-  const handleTabChange = (tab: React.SetStateAction<string>) => {
+  const handleTabChange = (tab: string) => {
     setActiveTab(tab);
   };
 
   const handleAddPress = () => {
-    console.log('Bouton + pressé !'); // Ajouté pour déboguer
+    console.log('Bouton + pressé !');
     navigation.navigate('AddTransaction');
   };
 
@@ -69,7 +73,12 @@ const HomeScreen = ({ navigation }) => {
         ))}
       </ScrollView>
 
-      <TouchableOpacity style={styles.floatingButton} onPress={handleAddPress}>
+      <TouchableOpacity
+        style={styles.floatingButton}
+        onPress={handleAddPress}
+        activeOpacity={0.7}
+        pointerEvents="box-only"
+      >
         <Text style={styles.floatingButtonText}>+</Text>
       </TouchableOpacity>
     </View>
@@ -126,6 +135,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 3,
     elevation: 5,
+    zIndex: 1000, // Ajouté pour s'assurer que le bouton est au-dessus des autres éléments
   },
   floatingButtonText: { color: '#FFF', fontSize: 30, fontWeight: 'bold' },
 });
