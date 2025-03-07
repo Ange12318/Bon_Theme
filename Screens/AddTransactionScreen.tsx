@@ -167,7 +167,7 @@ const AddTransactionScreen = ({ navigation }) => {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    flex: ,
     backgroundColor: '#000000',
     padding: 20,
   },
