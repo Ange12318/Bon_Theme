@@ -1,29 +1,60 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   TextInput,
-  Button,
   Platform,
   KeyboardAvoidingView,
   ScrollView,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import DateTimePicker from '@react-native-community/datetimepicker'; // Ajouté pour le sélecteur de date
+import * as Notifications from 'expo-notifications';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { theme, globalStyles } from '../utils/theme';
+
+interface Transaction {
+  id: string;
+  type: 'loan' | 'borrow';
+  name: string;
+  amount: string;
+  date: string;
+  status: 'normal' | 'urgent' | 'warning';
+  notes?: string;
+  photo?: string | null;
+  reminderEnabled: boolean;
+  reminderFrequency: 'sameDay' | '1dayBefore' | '3daysBefore';
+  state: 'en cours' | 'remboursé' | 'annulé';
+}
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
 const AddTransactionScreen = ({ navigation, route }) => {
   const { itemToEdit } = route.params || {};
-  const [transactionType, setTransactionType] = useState(itemToEdit?.type || 'loan');
+  const [transactionType, setTransactionType] = useState<'loan' | 'borrow'>(itemToEdit?.type || 'loan');
   const [toFrom, setToFrom] = useState(itemToEdit?.name || '');
   const [amountOrItem, setAmountOrItem] = useState(itemToEdit?.amount || '');
   const [date, setDate] = useState(itemToEdit?.date ? new Date(itemToEdit.date) : new Date());
-  const [priority, setPriority] = useState(itemToEdit?.status || 'normal');
+  const [priority, setPriority] = useState<'normal' | 'urgent' | 'warning'>(itemToEdit?.status || 'normal');
   const [notes, setNotes] = useState(itemToEdit?.notes || '');
   const [photo, setPhoto] = useState(itemToEdit?.photo || null);
   const [reminderEnabled, setReminderEnabled] = useState(itemToEdit?.reminderEnabled || false);
+  const [reminderFrequency, setReminderFrequency] = useState<'sameDay' | '1dayBefore' | '3daysBefore'>(
+    itemToEdit?.reminderFrequency || 'sameDay'
+  );
   const [showDatePicker, setShowDatePicker] = useState(false);
+
+  useEffect(() => {
+    requestPermission();
+    registerForPushNotificationsAsync();
+  }, []);
 
   const requestPermission = async () => {
     if (Platform.OS !== 'web') {
@@ -35,6 +66,40 @@ const AddTransactionScreen = ({ navigation, route }) => {
       return true;
     }
     return true;
+  };
+
+  const registerForPushNotificationsAsync = async () => {
+    const { status } = await Notifications.requestPermissionsAsync();
+    if (status !== 'granted') {
+      alert('Échec de la demande de permissions de notification !');
+    }
+  };
+
+  const scheduleNotification = async (transactionDate: Date) => {
+    if (reminderEnabled) {
+      let triggerDate = new Date(transactionDate);
+      switch (reminderFrequency) {
+        case '1dayBefore':
+          triggerDate.setDate(triggerDate.getDate() - 1);
+          break;
+        case '3daysBefore':
+          triggerDate.setDate(triggerDate.getDate() - 3);
+          break;
+        case 'sameDay':
+        default:
+          break;
+      }
+      if (triggerDate > new Date()) {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: `Rappel de transaction`,
+            body: `Échéance pour ${toFrom} (${amountOrItem}) le ${transactionDate.toLocaleDateString('fr-FR')}`,
+            data: { transactionId: itemToEdit?.id || Date.now().toString() },
+          },
+          trigger: triggerDate,
+        });
+      }
+    }
   };
 
   const pickImage = async () => {
@@ -63,21 +128,22 @@ const AddTransactionScreen = ({ navigation, route }) => {
     setDate(currentDate);
   };
 
-  const handleSave = () => {
-    const newTransaction = {
+  const handleSave = async () => {
+    const newTransaction: Transaction = {
       id: itemToEdit?.id || Date.now().toString(),
       type: transactionType,
       name: toFrom,
       amount: amountOrItem,
-      date: date.toLocaleDateString('fr-FR'),
+      date: date.toISOString(),
       status: priority,
       notes,
       photo,
       reminderEnabled,
+      reminderFrequency,
       state: itemToEdit?.state || 'en cours',
     };
+    await scheduleNotification(date);
     navigation.navigate('Home', { newTransaction, isEdit: !!itemToEdit });
-    navigation.goBack();
   };
 
   const handleCancel = () => {
@@ -111,7 +177,7 @@ const AddTransactionScreen = ({ navigation, route }) => {
           placeholder={transactionType === 'loan' ? 'À qui ?' : 'De qui ?'}
           value={toFrom}
           onChangeText={setToFrom}
-          placeholderTextColor="#CCC"
+          placeholderTextColor={theme.muted}
           autoFocus={true}
         />
         <TextInput
@@ -119,7 +185,7 @@ const AddTransactionScreen = ({ navigation, route }) => {
           placeholder="Montant ou objet (ex: 20€, Livre)"
           value={amountOrItem}
           onChangeText={setAmountOrItem}
-          placeholderTextColor="#CCC"
+          placeholderTextColor={theme.muted}
         />
         <TouchableOpacity style={styles.dateButton} onPress={() => setShowDatePicker(true)}>
           <Text style={styles.dateText}>
@@ -130,8 +196,9 @@ const AddTransactionScreen = ({ navigation, route }) => {
           <DateTimePicker
             value={date}
             mode="date"
-            display="default"
+            display="inline"
             onChange={onDateChange}
+            style={styles.datePicker}
           />
         )}
         <View style={styles.priorityContainer}>
@@ -149,13 +216,19 @@ const AddTransactionScreen = ({ navigation, route }) => {
             <View style={styles.urgentDot} />
             <Text style={styles.priorityText}>Urgent</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.priorityButton, priority === 'warning' ? styles.priorityActive : null]}
+            onPress={() => setPriority('warning')}
+          >
+            <Text style={styles.priorityText}>Avertissement</Text>
+          </TouchableOpacity>
         </View>
         <TextInput
           style={[styles.input, styles.notesInput]}
           placeholder="Notes supplémentaires"
           value={notes}
           onChangeText={setNotes}
-          placeholderTextColor="#CCC"
+          placeholderTextColor={theme.muted}
           multiline
         />
         <TouchableOpacity style={styles.photoButton} onPress={pickImage}>
@@ -174,10 +247,37 @@ const AddTransactionScreen = ({ navigation, route }) => {
             <View style={[styles.toggleCircle, reminderEnabled && styles.toggleActive]} />
           </TouchableOpacity>
         </View>
+        {reminderEnabled && (
+          <View style={styles.frequencyContainer}>
+            <Text style={styles.label}>Fréquence:</Text>
+            <TouchableOpacity
+              style={[styles.frequencyButton, reminderFrequency === 'sameDay' ? styles.frequencyActive : null]}
+              onPress={() => setReminderFrequency('sameDay')}
+            >
+              <Text style={styles.frequencyText}>Même jour</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.frequencyButton, reminderFrequency === '1dayBefore' ? styles.frequencyActive : null]}
+              onPress={() => setReminderFrequency('1dayBefore')}
+            >
+              <Text style={styles.frequencyText}>1 jour avant</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.frequencyButton, reminderFrequency === '3daysBefore' ? styles.frequencyActive : null]}
+              onPress={() => setReminderFrequency('3daysBefore')}
+            >
+              <Text style={styles.frequencyText}>3 jours avant</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         <View style={styles.buttonContainer}>
-          <Button title="Annuler" onPress={handleCancel} color="#FF4040" />
-          <Button title="Sauvegarder" onPress={handleSave} color="#32CD32" />
+          <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
+            <Text style={styles.buttonText}>Annuler</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
+            <Text style={styles.buttonText}>Sauvegarder</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -186,23 +286,18 @@ const AddTransactionScreen = ({ navigation, route }) => {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#000000',
-    padding: 20,
+    ...globalStyles.container,
   },
   scrollView: {
     flex: 1,
   },
   content: {
-    flex: 1,
+    flexGrow: 1,
     alignItems: 'center',
-    justifyContent: 'center',
     paddingBottom: 20,
   },
   title: {
-    color: '#FFF',
-    fontSize: 24,
-    fontWeight: 'bold',
+    ...globalStyles.title,
     marginBottom: 20,
   },
   typeContainer: {
@@ -212,37 +307,29 @@ const styles = StyleSheet.create({
     width: '90%',
   },
   typeButton: {
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    backgroundColor: '#FFA500',
-    borderRadius: 15,
+    ...globalStyles.button,
+    backgroundColor: theme.primary,
     width: '45%',
-    alignItems: 'center',
-    shadowColor: '#FFF',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 5,
   },
   typeActive: {
-    backgroundColor: '#32CD32',
+    backgroundColor: theme.secondary,
   },
   typeText: {
-    color: '#FFF',
+    ...globalStyles.text,
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
   input: {
     height: 50,
-    borderColor: '#333',
+    borderColor: theme.muted,
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: 12,
     marginBottom: 15,
-    paddingHorizontal: 10,
-    color: '#FFF',
-    backgroundColor: '#222',
+    paddingHorizontal: 15,
+    color: theme.text,
+    backgroundColor: '#2A3A4F',
     width: '90%',
-    textAlign: 'center',
+    fontSize: 16,
   },
   notesInput: {
     height: 100,
@@ -251,18 +338,24 @@ const styles = StyleSheet.create({
   },
   dateButton: {
     height: 50,
-    borderColor: '#333',
+    borderColor: theme.muted,
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: 12,
     marginBottom: 15,
-    paddingHorizontal: 10,
+    paddingHorizontal: 15,
     justifyContent: 'center',
-    backgroundColor: '#222',
+    backgroundColor: '#2A3A4F',
     width: '90%',
   },
   dateText: {
-    color: '#FFF',
+    ...globalStyles.text,
     fontSize: 16,
+  },
+  datePicker: {
+    width: '90%',
+    backgroundColor: '#2A3A4F',
+    borderRadius: 12,
+    marginBottom: 15,
   },
   priorityContainer: {
     flexDirection: 'row',
@@ -270,49 +363,46 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     width: '90%',
     justifyContent: 'center',
+    flexWrap: 'wrap',
   },
   label: {
-    color: '#FFF',
+    ...globalStyles.text,
     fontSize: 16,
     marginRight: 10,
   },
   priorityButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    backgroundColor: '#444',
-    borderRadius: 10,
+    ...globalStyles.button,
+    backgroundColor: '#2A3A4F',
     marginRight: 10,
+    marginBottom: 10,
   },
   priorityActive: {
-    backgroundColor: '#32CD32',
+    backgroundColor: theme.secondary,
   },
   priorityText: {
-    color: '#FFF',
+    ...globalStyles.text,
     fontSize: 14,
   },
   urgentDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#FF4040',
+    backgroundColor: theme.danger,
     marginRight: 5,
   },
   photoButton: {
-    paddingVertical: 15,
-    backgroundColor: '#444',
-    borderRadius: 10,
-    alignItems: 'center',
+    ...globalStyles.button,
+    backgroundColor: '#2A3A4F',
     marginBottom: 10,
     width: '90%',
   },
   photoText: {
-    color: '#FFF',
+    ...globalStyles.text,
     fontSize: 16,
   },
   photoHint: {
-    color: '#CCC',
+    ...globalStyles.text,
+    color: theme.muted,
     fontSize: 12,
     textAlign: 'center',
     marginBottom: 15,
@@ -329,7 +419,7 @@ const styles = StyleSheet.create({
     width: 50,
     height: 30,
     borderRadius: 15,
-    backgroundColor: '#444',
+    backgroundColor: '#2A3A4F',
     justifyContent: 'center',
     padding: 2,
   },
@@ -337,18 +427,54 @@ const styles = StyleSheet.create({
     width: 26,
     height: 26,
     borderRadius: 13,
-    backgroundColor: '#999',
+    backgroundColor: '#A3BFFA',
     transform: [{ translateX: 0 }],
   },
   toggleActive: {
-    backgroundColor: '#32CD32',
+    backgroundColor: theme.secondary,
     transform: [{ translateX: 20 }],
+  },
+  frequencyContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+    width: '90%',
+    justifyContent: 'space-around',
+    flexWrap: 'wrap',
+  },
+  frequencyButton: {
+    ...globalStyles.button,
+    backgroundColor: '#2A3A4F',
+    marginBottom: 10,
+    paddingHorizontal: 10,
+  },
+  frequencyActive: {
+    backgroundColor: theme.secondary,
+  },
+  frequencyText: {
+    ...globalStyles.text,
+    fontSize: 14,
   },
   buttonContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     width: '90%',
     marginTop: 20,
+  },
+  cancelButton: {
+    ...globalStyles.button,
+    backgroundColor: theme.danger,
+    width: '45%',
+  },
+  saveButton: {
+    ...globalStyles.button,
+    backgroundColor: theme.primary,
+    width: '45%',
+  },
+  buttonText: {
+    ...globalStyles.text,
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 
