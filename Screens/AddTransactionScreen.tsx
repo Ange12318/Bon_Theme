@@ -11,16 +11,19 @@ import {
   ScrollView,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import DateTimePicker from '@react-native-community/datetimepicker'; // Ajouté pour le sélecteur de date
 
-const AddTransactionScreen = ({ navigation }) => {
-  const [transactionType, setTransactionType] = useState('loan');
-  const [toFrom, setToFrom] = useState('');
-  const [amountOrItem, setAmountOrItem] = useState('');
-  const [date, setDate] = useState('');
-  const [priority, setPriority] = useState('normal');
-  const [notes, setNotes] = useState('');
-  const [photo, setPhoto] = useState<string | null>(null);
-  const [reminderEnabled, setReminderEnabled] = useState(false);
+const AddTransactionScreen = ({ navigation, route }) => {
+  const { itemToEdit } = route.params || {};
+  const [transactionType, setTransactionType] = useState(itemToEdit?.type || 'loan');
+  const [toFrom, setToFrom] = useState(itemToEdit?.name || '');
+  const [amountOrItem, setAmountOrItem] = useState(itemToEdit?.amount || '');
+  const [date, setDate] = useState(itemToEdit?.date ? new Date(itemToEdit.date) : new Date());
+  const [priority, setPriority] = useState(itemToEdit?.status || 'normal');
+  const [notes, setNotes] = useState(itemToEdit?.notes || '');
+  const [photo, setPhoto] = useState(itemToEdit?.photo || null);
+  const [reminderEnabled, setReminderEnabled] = useState(itemToEdit?.reminderEnabled || false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const requestPermission = async () => {
     if (Platform.OS !== 'web') {
@@ -54,17 +57,26 @@ const AddTransactionScreen = ({ navigation }) => {
     }
   };
 
+  const onDateChange = (event, selectedDate) => {
+    const currentDate = selectedDate || date;
+    setShowDatePicker(false);
+    setDate(currentDate);
+  };
+
   const handleSave = () => {
-    console.log({
+    const newTransaction = {
+      id: itemToEdit?.id || Date.now().toString(),
       type: transactionType,
-      toFrom,
-      amountOrItem,
-      date,
-      priority,
+      name: toFrom,
+      amount: amountOrItem,
+      date: date.toLocaleDateString('fr-FR'),
+      status: priority,
       notes,
       photo,
       reminderEnabled,
-    });
+      state: itemToEdit?.state || 'en cours',
+    };
+    navigation.navigate('Home', { newTransaction, isEdit: !!itemToEdit });
     navigation.goBack();
   };
 
@@ -78,6 +90,7 @@ const AddTransactionScreen = ({ navigation }) => {
       style={styles.container}
     >
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
+        <Text style={styles.title}>Nouvelle Transaction</Text>
         <View style={styles.typeContainer}>
           <TouchableOpacity
             style={[styles.typeButton, transactionType === 'loan' ? styles.typeActive : null]}
@@ -108,13 +121,19 @@ const AddTransactionScreen = ({ navigation }) => {
           onChangeText={setAmountOrItem}
           placeholderTextColor="#CCC"
         />
-        <TextInput
-          style={styles.input}
-          placeholder="Date échéance (jj/mm/aa)"
-          value={date}
-          onChangeText={setDate}
-          placeholderTextColor="#CCC"
-        />
+        <TouchableOpacity style={styles.dateButton} onPress={() => setShowDatePicker(true)}>
+          <Text style={styles.dateText}>
+            Date échéance: {date.toLocaleDateString('fr-FR')}
+          </Text>
+        </TouchableOpacity>
+        {showDatePicker && (
+          <DateTimePicker
+            value={date}
+            mode="date"
+            display="default"
+            onChange={onDateChange}
+          />
+        )}
         <View style={styles.priorityContainer}>
           <Text style={styles.label}>Priorité:</Text>
           <TouchableOpacity
@@ -147,7 +166,7 @@ const AddTransactionScreen = ({ navigation }) => {
         {photo && <Text style={styles.photoHint}>Appuyez pour changer la photo</Text>}
 
         <View style={styles.reminderContainer}>
-          <Text style={styles.label}>Rappel automatique (2 jours avant):</Text>
+          <Text style={styles.label}>Rappels:</Text>
           <TouchableOpacity
             style={styles.reminderToggle}
             onPress={() => setReminderEnabled(!reminderEnabled)}
@@ -167,7 +186,7 @@ const AddTransactionScreen = ({ navigation }) => {
 
 const styles = StyleSheet.create({
   container: {
-    flex: ,
+    flex: 1,
     backgroundColor: '#000000',
     padding: 20,
   },
@@ -175,10 +194,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    flex: 1, // Ajouté pour permettre le centrage vertical
-    alignItems: 'center', // Centrage horizontal
-    justifyContent: 'center', // Centrage vertical
-    paddingBottom: 10, // Réduit pour éviter un espacement excessif
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: 20,
+  },
+  title: {
+    color: '#FFF',
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 20,
   },
   typeContainer: {
     flexDirection: 'row',
@@ -223,6 +248,21 @@ const styles = StyleSheet.create({
     height: 100,
     textAlignVertical: 'top',
     textAlign: 'left',
+  },
+  dateButton: {
+    height: 50,
+    borderColor: '#333',
+    borderWidth: 1,
+    borderRadius: 10,
+    marginBottom: 15,
+    paddingHorizontal: 10,
+    justifyContent: 'center',
+    backgroundColor: '#222',
+    width: '90%',
+  },
+  dateText: {
+    color: '#FFF',
+    fontSize: 16,
   },
   priorityContainer: {
     flexDirection: 'row',

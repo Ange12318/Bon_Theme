@@ -3,6 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import HomeScreen from './Screens/HomeScreen';
 import AddTransactionScreen from './Screens/AddTransactionScreen';
+import DetailsScreen from './Screens/DetailsScreen';
 
 const Stack = createStackNavigator();
 
@@ -18,6 +19,11 @@ const App = () => {
         <Stack.Screen
           name="AddTransaction"
           component={AddTransactionScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="Details"
+          component={DetailsScreen}
           options={{ headerShown: false }}
         />
       </Stack.Navigator>

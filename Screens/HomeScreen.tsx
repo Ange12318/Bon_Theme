@@ -4,25 +4,21 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-nati
 const HomeScreen = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState('loans');
   const [loans, setLoans] = useState([
-    { id: '1', name: 'Paul', amount: '10€', date: '10/03/25', status: 'urgent' },
-    { id: '2', name: 'Dalée', amount: '20€', date: '15/03/25', status: 'warning' },
-    { id: '3', name: 'Polette', amount: 'Veste', date: '15/03/25', status: 'safe' },
+    { id: '1', name: 'Paul', amount: '10€', date: '10/03/25', status: 'urgent', state: 'en cours' },
+    { id: '2', name: 'Dalée', amount: '20€', date: '15/03/25', status: 'warning', state: 'remboursé' },
+    { id: '3', name: 'Polette', amount: 'Veste', date: '15/03/25', status: 'safe', state: 'annulé' },
   ]);
   const [borrows, setBorrows] = useState([
-    { id: '4', name: 'Marie', amount: 'Harry Potter', date: '20/03/25', status: 'safe' },
-    { id: '5', name: 'Larice', amount: '20€', date: '15/03/25', status: 'safe' },
+    { id: '4', name: 'Marie', amount: 'Harry Potter', date: '20/03/25', status: 'safe', state: 'en cours' },
+    { id: '5', name: 'Larice', amount: '20€', date: '15/03/25', status: 'safe', state: 'remboursé' },
   ]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'urgent':
-        return '#FF4040';
-      case 'warning':
-        return '#FFA500';
-      case 'safe':
-        return '#32CD32';
-      default:
-        return '#32CD32';
+      case 'urgent': return '#FF4040';
+      case 'warning': return '#FFA500';
+      case 'safe': return '#32CD32';
+      default: return '#32CD32';
     }
   };
 
@@ -31,8 +27,19 @@ const HomeScreen = ({ navigation }) => {
   };
 
   const handleAddPress = () => {
-    console.log('Bouton + pressé !');
     navigation.navigate('AddTransaction');
+  };
+
+  const handleDelete = (id: string, isLoan: boolean) => {
+    if (isLoan) {
+      setLoans(loans.filter(item => item.id !== id));
+    } else {
+      setBorrows(borrows.filter(item => item.id !== id));
+    }
+  };
+
+  const handleDetails = (item: any) => {
+    navigation.navigate('Details', { item });
   };
 
   const currentData = activeTab === 'loans' ? loans : borrows;
@@ -60,15 +67,19 @@ const HomeScreen = ({ navigation }) => {
       <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
         {currentData.map((item) => (
           <View key={item.id} style={styles.card}>
-            <View style={styles.cardInfo}>
+            <TouchableOpacity onPress={() => handleDetails(item)} style={styles.cardInfo}>
               <Text style={styles.cardName}>{item.name}</Text>
               <Text style={styles.cardDetails}>
-                {item.amount} – {item.date}
+                {item.amount} – {item.date} ({item.state})
               </Text>
-            </View>
-            <View
-              style={[styles.statusCircle, { backgroundColor: getStatusColor(item.status) }]}
-            />
+            </TouchableOpacity>
+            <View style={[styles.statusCircle, { backgroundColor: getStatusColor(item.status) }]} />
+            <TouchableOpacity
+              style={styles.deleteButton}
+              onPress={() => handleDelete(item.id, activeTab === 'loans')}
+            >
+              <Text style={styles.deleteText}>X</Text>
+            </TouchableOpacity>
           </View>
         ))}
       </ScrollView>
@@ -135,9 +146,18 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 3,
     elevation: 5,
-    zIndex: 1000, // Ajouté pour s'assurer que le bouton est au-dessus des autres éléments
+    zIndex: 1000,
   },
   floatingButtonText: { color: '#FFF', fontSize: 30, fontWeight: 'bold' },
+  deleteButton: {
+    padding: 5,
+    backgroundColor: '#FF4040',
+    borderRadius: 5,
+  },
+  deleteText: {
+    color: '#FFF',
+    fontSize: 14,
+  },
 });
 
 export default HomeScreen;
