@@ -8,6 +8,7 @@ import {
   Platform,
   KeyboardAvoidingView,
   ScrollView,
+  Image,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Notifications from 'expo-notifications';
@@ -50,6 +51,7 @@ const AddTransactionScreen = ({ navigation, route }) => {
     itemToEdit?.reminderFrequency || 'sameDay'
   );
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
 
   useEffect(() => {
     requestPermission();
@@ -93,13 +95,24 @@ const AddTransactionScreen = ({ navigation, route }) => {
         await Notifications.scheduleNotificationAsync({
           content: {
             title: `Rappel de transaction`,
-            body: `Échéance pour ${toFrom} (${amountOrItem}) le ${transactionDate.toLocaleDateString('fr-FR')}`,
+            body: `Échéance pour ${toFrom} (${amountOrItem}) le ${triggerDate.toLocaleDateString('fr-FR')} à ${triggerDate.toLocaleTimeString('fr-FR')}`,
             data: { transactionId: itemToEdit?.id || Date.now().toString() },
           },
           trigger: triggerDate,
         });
       }
     }
+  };
+
+  const sendAddConfirmationNotification = async (transaction: Transaction) => {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Transaction ajoutée !',
+        body: `Vous venez d'ajouter une transaction : ${transaction.type === 'loan' ? 'Prêt' : 'Emprunt'} à ${transaction.name} pour ${transaction.amount} (Échéance: ${new Date(transaction.date).toLocaleDateString('fr-FR')})`,
+        data: { transactionId: transaction.id },
+      },
+      trigger: { seconds: 1 },
+    });
   };
 
   const pickImage = async () => {
@@ -115,6 +128,7 @@ const AddTransactionScreen = ({ navigation, route }) => {
 
       if (!result.canceled) {
         setPhoto(result.assets[0].uri);
+        console.log('Photo sélectionnée :', result.assets[0].uri); // Log pour vérifier le URI
       }
     } catch (error) {
       console.error('Erreur lors de la sélection de la photo :', error);
@@ -128,6 +142,12 @@ const AddTransactionScreen = ({ navigation, route }) => {
     setDate(currentDate);
   };
 
+  const onTimeChange = (event, selectedTime) => {
+    const currentTime = selectedTime || date;
+    setShowTimePicker(false);
+    setDate(currentTime);
+  };
+
   const handleSave = async () => {
     const newTransaction: Transaction = {
       id: itemToEdit?.id || Date.now().toString(),
@@ -137,12 +157,14 @@ const AddTransactionScreen = ({ navigation, route }) => {
       date: date.toISOString(),
       status: priority,
       notes,
-      photo,
+      photo, // Vérifier que photo est bien inclus
       reminderEnabled,
       reminderFrequency,
       state: itemToEdit?.state || 'en cours',
     };
+    console.log('Transaction sauvegardée avec photo :', newTransaction.photo); // Log pour vérifier
     await scheduleNotification(date);
+    await sendAddConfirmationNotification(newTransaction);
     navigation.navigate('Home', { newTransaction, isEdit: !!itemToEdit });
   };
 
@@ -201,6 +223,20 @@ const AddTransactionScreen = ({ navigation, route }) => {
             style={styles.datePicker}
           />
         )}
+        <TouchableOpacity style={styles.timeButton} onPress={() => setShowTimePicker(true)}>
+          <Text style={styles.timeText}>
+            Heure: {date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+          </Text>
+        </TouchableOpacity>
+        {showTimePicker && (
+          <DateTimePicker
+            value={date}
+            mode="time"
+            display="inline"
+            onChange={onTimeChange}
+            style={styles.timePicker}
+          />
+        )}
         <View style={styles.priorityContainer}>
           <Text style={styles.label}>Priorité:</Text>
           <TouchableOpacity
@@ -236,7 +272,12 @@ const AddTransactionScreen = ({ navigation, route }) => {
             {photo ? 'Photo ajoutée' : 'Ajouter une photo'}
           </Text>
         </TouchableOpacity>
-        {photo && <Text style={styles.photoHint}>Appuyez pour changer la photo</Text>}
+        {photo && (
+          <>
+            <Text style={styles.photoHint}>Appuyez pour changer la photo</Text>
+            <Image source={{ uri: photo }} style={styles.photoPreview} />
+          </>
+        )}
 
         <View style={styles.reminderContainer}>
           <Text style={styles.label}>Rappels:</Text>
@@ -295,6 +336,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     alignItems: 'center',
     paddingBottom: 20,
+    marginTop: 50,
   },
   title: {
     ...globalStyles.title,
@@ -357,6 +399,27 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 15,
   },
+  timeButton: {
+    height: 50,
+    borderColor: theme.muted,
+    borderWidth: 1,
+    borderRadius: 12,
+    marginBottom: 15,
+    paddingHorizontal: 15,
+    justifyContent: 'center',
+    backgroundColor: '#2A3A4F',
+    width: '90%',
+  },
+  timeText: {
+    ...globalStyles.text,
+    fontSize: 16,
+  },
+  timePicker: {
+    width: '90%',
+    backgroundColor: '#2A3A4F',
+    borderRadius: 12,
+    marginBottom: 15,
+  },
   priorityContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -407,6 +470,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 15,
     width: '90%',
+  },
+  photoPreview: {
+    width: '90%',
+    height: 100,
+    borderRadius: 12,
+    marginBottom: 15,
   },
   reminderContainer: {
     flexDirection: 'row',

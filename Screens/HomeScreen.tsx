@@ -40,8 +40,16 @@ const HomeScreen = ({ navigation, route }) => {
     const loadData = async () => {
       const savedLoans = await AsyncStorage.getItem('loans');
       const savedBorrows = await AsyncStorage.getItem('borrows');
-      if (savedLoans) setLoans(JSON.parse(savedLoans));
-      if (savedBorrows) setBorrows(JSON.parse(savedBorrows));
+      if (savedLoans) {
+        const parsedLoans = JSON.parse(savedLoans);
+        setLoans(parsedLoans);
+        console.log('Données chargées (loans) :', parsedLoans); // Log pour vérifier
+      }
+      if (savedBorrows) {
+        const parsedBorrows = JSON.parse(savedBorrows);
+        setBorrows(parsedBorrows);
+        console.log('Données chargées (borrows) :', parsedBorrows); // Log pour vérifier
+      }
       const allTransactions = [...(savedLoans ? JSON.parse(savedLoans) : []), ...(savedBorrows ? JSON.parse(savedBorrows) : [])];
       allTransactions.forEach(async (transaction) => {
         if (transaction.reminderEnabled && new Date(transaction.date) > new Date()) {
@@ -61,7 +69,7 @@ const HomeScreen = ({ navigation, route }) => {
             await Notifications.scheduleNotificationAsync({
               content: {
                 title: `Rappel de transaction`,
-                body: `Échéance pour ${transaction.name} (${transaction.amount}) le ${new Date(transaction.date).toLocaleDateString('fr-FR')}`,
+                body: `Échéance pour ${transaction.name} (${transaction.amount}) le ${new Date(transaction.date).toLocaleDateString('fr-FR')} à ${new Date(transaction.date).toLocaleTimeString('fr-FR')}`,
                 data: { transactionId: transaction.id },
               },
               trigger: triggerDate,
@@ -76,6 +84,7 @@ const HomeScreen = ({ navigation, route }) => {
   useEffect(() => {
     const { newTransaction, isEdit } = route.params || {};
     if (newTransaction) {
+      console.log('Nouvelle transaction reçue dans HomeScreen :', newTransaction); // Log pour vérifier
       const updateList = async () => {
         if (newTransaction.type === 'loan') {
           const updatedLoans = isEdit
@@ -136,6 +145,7 @@ const HomeScreen = ({ navigation, route }) => {
   };
 
   const handleDetails = (item: Transaction) => {
+    console.log('Détails de l\'item envoyé :', item); // Log pour vérifier
     navigation.navigate('Details', { item });
   };
 
@@ -144,8 +154,8 @@ const HomeScreen = ({ navigation, route }) => {
 
   return (
     <View style={styles.container}>
-      <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
-        <Text style={styles.welcomeText}>Bienvenue dans Bon_Compte !</Text>
+      <Animated.View style={[styles.header, { opacity: fadeAnim, marginTop: 50 }]}>
+        <Text style={styles.welcomeText}>Bienvenue dans Bon !</Text>
         <Text style={styles.subtitle}>Gérez vos prêts et emprunts facilement</Text>
       </Animated.View>
       <View style={styles.tabContainer}>
@@ -228,7 +238,7 @@ const styles = StyleSheet.create({
     color: theme.muted,
     fontFamily: 'Roboto-Regular',
   },
-  tabContainer: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 20 },
+  tabContainer: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 20, marginTop: 20 },
   tab: {
     ...globalStyles.button,
     backgroundColor: theme.primary,
@@ -246,14 +256,15 @@ const styles = StyleSheet.create({
     ...globalStyles.title,
     textAlign: 'center',
     marginBottom: 20,
+    marginTop: 20,
   },
   list: { flex: 1 },
-  listContent: { alignItems: 'center', paddingBottom: 100 },
+  listContent: { alignItems: 'center', paddingBottom: 100, marginTop: 20 },
   card: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     backgroundColor: theme.cardBackground,
-    padding: 20,
+    padding: 15,
     marginBottom: 15,
     borderRadius: 15,
     width: '90%',
@@ -274,7 +285,7 @@ const styles = StyleSheet.create({
   floatingButton: {
     ...globalStyles.button,
     position: 'absolute',
-    bottom: 20,
+    bottom: 40,
     right: 20,
     backgroundColor: theme.secondary,
     width: 60,

@@ -18,6 +18,8 @@ interface Transaction {
 
 const DetailsScreen = ({ navigation, route }) => {
   const { item }: { item: Transaction } = route.params;
+  console.log('Détails reçus dans DetailsScreen :', item); // Log pour vérifier
+  console.log('Photo dans DetailsScreen :', item.photo); // Log spécifique pour la photo
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
 
   React.useEffect(() => {
@@ -30,7 +32,7 @@ const DetailsScreen = ({ navigation, route }) => {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Animated.View style={{ opacity: fadeAnim }}>
+      <Animated.View style={{ opacity: fadeAnim, marginTop: 50 }}>
         <Text style={styles.title}>Détails de la Transaction</Text>
         <View style={styles.detailContainer}>
           <Text style={styles.detailLabel}>Type:</Text>
@@ -46,7 +48,9 @@ const DetailsScreen = ({ navigation, route }) => {
         </View>
         <View style={styles.detailContainer}>
           <Text style={styles.detailLabel}>Date:</Text>
-          <Text style={styles.detailText}>{new Date(item.date).toLocaleDateString('fr-FR')}</Text>
+          <Text style={styles.detailText}>
+            {new Date(item.date).toLocaleDateString('fr-FR')} à {new Date(item.date).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+          </Text>
         </View>
         <View style={styles.detailContainer}>
           <Text style={styles.detailLabel}>État:</Text>
@@ -65,7 +69,11 @@ const DetailsScreen = ({ navigation, route }) => {
           </View>
         )}
         {item.photo ? (
-          <Image source={{ uri: item.photo }} style={styles.photo} />
+          <Image
+            source={{ uri: item.photo }}
+            style={styles.photo}
+            onError={(e) => console.log('Erreur de chargement de l\'image :', e.nativeEvent.error)}
+          />
         ) : (
           <Text style={styles.noPhotoText}>Aucune photo disponible</Text>
         )}
